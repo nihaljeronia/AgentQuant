@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentquant"
+version = "0.1.0"
+description = "Agentic AI quantitative strategy research system for stock market experimentation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "yfinance",
+  "pandas",
+  "numpy",
+  "langgraph",
+  "langchain",
+  "langchain-openai",
+  "langchain-community",
+  "chromadb",
+  "sqlite-utils",
+  "streamlit",
+  "python-dotenv",
+]
+license = { text = "MIT" }
+authors = [
+  { name = "AgentQuant Research" }
+]
+
+[tool.setuptools]
+packages = ["agents", "backtest", "data_layer", "memory", "report"]

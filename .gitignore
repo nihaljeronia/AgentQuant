@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.venv/
+venv/
+venv.bak/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Generated data and artifacts
+*.db
+*.sqlite3
+*.log
+*.csv
+*.docx
+*.xlsx
+*.xls
+*.parquet
+*.pkl
+
+# Local data stores
+memory/chroma_db/
+data_layer/cache/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build
+build/
+dist/
+*.egg-info/
