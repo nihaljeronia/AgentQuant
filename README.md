@@ -1,30 +1,57 @@
 # AgentQuant
 
-A research-focused agentic trading system that generates, backtests, critiques, and refines stock trading hypotheses using a multi-step AI workflow.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+" />
+  <img src="https://img.shields.io/badge/LangGraph-Agent%20Loop-6A5AE0" alt="LangGraph" />
+  <img src="https://img.shields.io/badge/OpenAI-GPT%204o%2F4o-mini-412991" alt="OpenAI" />
+  <img src="https://img.shields.io/badge/Status-Research%20Prototype-FFA726" alt="Status" />
+</p>
+
+AgentQuant is an experimental agentic trading research project that tests whether a multi-step AI workflow can improve stock strategy discovery compared with a single-shot model baseline.
 
 ## Overview
 
-AgentQuant explores whether a loop of:
+The system combines:
 
-- hypothesis generation
-- rule-based backtesting
-- critique and rejection checks
-- refinement and re-testing
+- real NSE stock price data
+- deterministic backtesting logic
+- structured strategy schemas
+- LLM-based hypothesis generation
+- critique and refinement loops
+- memory persistence across attempts
 
-can produce stronger trading strategies than a single-shot baseline.
+The core idea is simple: generate a strategy, backtest it, critique it, revise it, and repeat until the loop converges on a stronger idea.
 
-The project uses historical Indian equity data, a deterministic backtest engine, and a lightweight multi-agent loop built around LangGraph and LLM-based reasoning.
+## Why this project matters
 
-## Why this project
+Most strategy work is slow, manual, and highly dependent on human intuition. AgentQuant explores a different pattern:
 
-This repository is designed as a clean research prototype and portfolio project for:
+- propose a rule
+- evaluate it on historical data
+- get model feedback on quality and risk
+- refine the idea with explicit critique
+- validate against a held-out window
 
-- agentic workflow design
-- quantitative strategy evaluation
-- LLM-assisted research loops
-- structured experimentation with memory and critique
+This makes it a useful project for learning agentic AI design, research loops, and systematic strategy evaluation.
 
-It is intended for experimentation and learning, not financial advice.
+## Architecture
+
+```text
+Hypothesis Agent --> Backtest Engine --> Critique Agent --> Refinement Agent
+      ^                                              |
+      |______________________________________________|
+```
+
+The loop is implemented in `graph.py` and uses `LangGraph` to orchestrate the workflow. Strategy output is structured through `schema.py`, while historical data and memory are managed in `data_layer/` and `memory/`.
+
+## Key features
+
+- Multi-agent research loop for strategy generation and refinement
+- Rule-based stock backtesting with trade simulation
+- Guardrails against obvious overfitting and weak sampling
+- Persistent SQLite and ChromaDB memory
+- Streamlit dashboard for viewing the research trail
+- Chronological train/test split for more disciplined evaluation
 
 ## Project structure
 
@@ -40,8 +67,7 @@ AgentQuant/
 │   ├── cache/
 │   └── fetch_prices.py
 ├── memory/
-│   ├── chroma_db/
-│   ├── agentquant.db
+│   ├── __init__.py
 │   ├── log_store.py
 │   └── vector_store.py
 ├── report/
@@ -57,40 +83,8 @@ AgentQuant/
 ├── requirements.txt
 ├── schema.py
 ├── variance_check.py
-└── .venv/           # local only, not tracked
+└── .venv/
 ```
-
-## Core workflow
-
-```mermaid
-flowchart LR
-    A[Hypothesis Agent] --> B[Backtest Engine]
-    B --> C[Critique Agent]
-    C -->|refine| D[Refinement Agent]
-    D --> B
-    C -->|accept| E[Final Strategy]
-```
-
-## Features
-
-- LLM-generated technical trading rules
-- qualitative critique and refinement loop
-- deterministic strategy backtesting
-- train/test split for research discipline
-- persistent SQLite and ChromaDB memory
-- Streamlit dashboard for reviewing attempts
-- Python package metadata for installability
-
-## Tech stack
-
-- Python 3.10+
-- LangGraph
-- LangChain / OpenAI
-- pandas / NumPy
-- yfinance
-- ChromaDB
-- SQLite
-- Streamlit
 
 ## Quick start
 
@@ -109,54 +103,57 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Configure environment
+3. Configure your OpenAI key
 
 ```bash
 copy .env.example .env
 ```
 
-Then update `.env`:
+Update `.env`:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-4. Run the baseline strategy
+4. Run the baseline
 
 ```bash
 python main_baseline.py
 ```
 
-5. Run the iterative research loop
+5. Run the iterative agent loop
 
 ```bash
 python graph.py
 ```
 
-6. Open the dashboard
+6. Launch the dashboard
 
 ```bash
 streamlit run report/dashboard.py
 ```
 
-## Research notes
+## Research and validation approach
 
-The project intentionally emphasizes experimentation and research reproducibility over production-grade trading infrastructure.
+The project is designed around a simple but important principle: do not evaluate on the same data used to generate the strategy.
+
+It uses a chronological split:
+
+- train/research window: used for strategy generation and refinement
+- validation/test window: held out and evaluated only after the loop finishes
+
+This helps reduce the chance that a strategy is only looking good because it has memorized the research window.
+
+## Notes
+
+This repository is a research prototype and a learning project. It is not financial advice and should not be treated as a production trading system.
 
 ## License
 
 This project is licensed under the MIT License. See `LICENSE` for details.
 
-## GitHub publish
+## GitHub
 
-From the repository root:
+Repository:
 
-```bash
-git add .
-git commit -m "Initial project cleanup and publish-ready setup"
-git branch -M main
-git remote add origin https://github.com/<your-username>/AgentQuant.git
-git push -u origin main
-```
-
-If you want a private repository instead of public, replace the remote URL with your private GitHub repo URL.
+- https://github.com/nihaljeronia/AgentQuant
