@@ -57,81 +57,49 @@ The loop is implemented in `graph.py` and uses `LangGraph` to orchestrate the wo
 
 ```text
 AgentQuant/
-├── agents/
-│   ├── critique_agent.py
-│   ├── hypothesis_agent.py
-│   └── refinement_agent.py
-├── backtest/
-│   └── engine.py
-├── data_layer/
-│   ├── cache/
-│   └── fetch_prices.py
-├── memory/
-│   ├── __init__.py
-│   ├── log_store.py
-│   └── vector_store.py
-├── report/
-│   └── dashboard.py
-├── .env.example
-├── .gitignore
-├── LICENSE
-├── README.md
-├── evaluate.py
-├── graph.py
-├── main_baseline.py
-├── pyproject.toml
-├── requirements.txt
-├── schema.py
-├── variance_check.py
-└── .venv/
+├── app.py                  # Streamlit dashboard (overview, live run, research runs, evaluation)
+├── config.py               # paths, model names, ticker list
+├── graph.py                # LangGraph research loop (CLI: python graph.py --ticker TCS.NS)
+├── schema.py               # strategy JSON contract
+├── evaluate.py             # 15-ticker loop vs baseline evaluation
+├── variance_check.py       # run-to-run variance check
+├── main_baseline.py        # single-shot baseline
+├── agents/                 # hypothesis, critique, refinement agents + shared OpenAI client
+├── backtest/engine.py      # deterministic backtester
+├── data_layer/             # yfinance download + CSV cache
+├── memory/                 # SQLite run log + ChromaDB similarity memory
+├── report/dashboard.py     # old entry point, opens app.py
+└── tests/                  # pytest suite (no API key needed)
 ```
 
-## Quick start
+## Quick start (Windows PowerShell)
 
-1. Create a virtual environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-# Windows PowerShell:
-# .\.venv\Scripts\Activate.ps1
-```
-
-2. Install dependencies
-
-```bash
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+copy .env.example .env      # then put your OPENAI_API_KEY in .env
+streamlit run app.py
 ```
 
-3. Configure your OpenAI key
+The dashboard has four pages:
 
-```bash
-copy .env.example .env
+- **Overview**: the pipeline and what is in the research database
+- **Run research**: pick a ticker and watch the agents propose, backtest, critique and refine live, then see the held-out validation score next to a single-shot baseline
+- **Research runs**: replay any recorded run with the price chart and buy/sell markers, equity curve, per-iteration metrics and the full critique trail
+- **Evaluation**: charts for `evaluation_summary*.csv` and `variance_report*.csv`
+
+Command line:
+
+```powershell
+python graph.py --ticker TCS.NS      # one research run (train split only, prints validation score)
+python main_baseline.py              # single-shot baseline
+python evaluate.py                   # full loop-vs-baseline evaluation
+python variance_check.py             # run-to-run variance
+python -m pytest -q                  # tests (no API key needed)
 ```
 
-Update `.env`:
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-4. Run the baseline
-
-```bash
-python main_baseline.py
-```
-
-5. Run the iterative agent loop
-
-```bash
-python graph.py
-```
-
-6. Launch the dashboard
-
-```bash
-streamlit run report/dashboard.py
-```
+Prices are cached in `data_layer/cache/` after the first download, so later runs don't need Yahoo Finance.
 
 ## Research and validation approach
 
@@ -144,9 +112,40 @@ It uses a chronological split:
 
 This helps reduce the chance that a strategy is only looking good because it has memorized the research window.
 
+## Limitations
+
+These are known and deliberate to state up front:
+
+- **"Sharpe" is a per-trade score, not an annualised Sharpe ratio.** It is computed as mean / std of trade returns multiplied by √(number of trades), so it behaves more like a t-statistic and rises with trade count. It is used only for relative comparison between strategies on the same window.
+- **No transaction costs or slippage are modelled.** NSE round-trip costs (STT, exchange charges, brokerage) of roughly 0.2–0.3% would reduce returns, especially for short holding periods.
+- **Entries fill at the signal day's close**, and stop-loss / take-profit are checked on closing prices only.
+- **Small sample.** Most strategies produce fewer than 20 trades in the roughly one-year validation window, so many results are flagged as degenerate. With 14 tickers and a Sharpe-delta standard deviation larger than its mean, the aggregate improvement is not statistically significant.
+- **Unequal comparison.** The iterative loop gets up to 8 attempts plus memory, while the baseline gets one stochastic proposal that is regenerated on every run. A best-of-N baseline is the planned fair control.
+- **Validation window reuse.** The same held-out window was inspected across evaluation versions, so it is no longer a fully untouched holdout.
+- **The Critique Agent applies fixed numeric thresholds**; its main value is the natural-language feedback that drives refinement.
+
+## Future work
+
+1. Annualised Sharpe alongside a separate significance statistic, transaction costs, and a buy-and-hold benchmark.
+2. Cached multi-draw baseline with a best-of-N control.
+3. Walk-forward evaluation over a longer history, plus a final untouched holdout run once.
+4. Turn memory off (or isolate it) during evaluation so runs are fully independent.
+
 ## Notes
 
 This repository is a research prototype and a learning project. It is not financial advice and should not be treated as a production trading system.
+
+## Team
+
+Developed as a B.Tech Major Project at ITM University Gwalior.
+
+- Nihal Jeronia
+- Devang Shrivastava
+- Rohit Prajapati
+- Satya Mishra
+- Sharad Rathore
+
+**Project guide:** Mr. Ashish Yadav, Department of CSA, SOCIS, ITM University Gwalior.
 
 ## License
 

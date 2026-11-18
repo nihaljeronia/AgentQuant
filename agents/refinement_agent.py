@@ -1,20 +1,13 @@
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage
-from dotenv import load_dotenv
 import json
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from schema import SCHEMA_PROMPT_TEMPLATE, sanitize_strategy
+from config import REFINEMENT_MODEL  # noqa: E402
+from schema import SCHEMA_PROMPT_TEMPLATE, sanitize_strategy  # noqa: E402
+from agents.llm import invoke_json  # noqa: E402
 
-load_dotenv()
-
-# Refinement agent uses gpt-4o-mini for cost efficiency during iteration
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0.7,
-    model_kwargs={"response_format": {"type": "json_object"}},
-)
+# Refinement agent uses gpt-4o-mini (REFINEMENT_MODEL) for cost efficiency during iteration.
+# The client is created lazily in agents/llm.py.
 
 PROMPT = """Your previous trading strategy proposal was judged as needing refinement.
 
@@ -35,13 +28,7 @@ def refine(hypothesis: dict, critique_reasoning: str) -> dict:
         critique_reasoning=critique_reasoning,
         schema_template=SCHEMA_PROMPT_TEMPLATE
     )
-    response = llm.invoke([HumanMessage(content=msg)])
-    text = str(response.content).strip().removeprefix("```json").removesuffix("```").strip()
-    try:
-        raw_data = json.loads(text)
-    except json.JSONDecodeError:
-        raw_data = {}
-        
+    raw_data = invoke_json(REFINEMENT_MODEL, 0.7, msg)
     return sanitize_strategy(raw_data)
 
 if __name__ == "__main__":

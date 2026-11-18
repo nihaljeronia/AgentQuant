@@ -4,8 +4,8 @@ numpy
 langgraph
 langchain
 langchain-openai
-langchain-community
 chromadb
-sqlite-utils
 streamlit
+plotly
 python-dotenv
+pytest
