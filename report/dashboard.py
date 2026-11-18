@@ -40,7 +40,8 @@ else:
                 st.json(hypo_data.get("params", {}))
                 st.markdown(f"**Reasoning:** {hypo_data.get('reasoning')}")
             with col2:
-                st.markdown("#### Validated Metrics")
+                st.markdown("#### Research-window metrics (in-sample)")
+                st.caption("Measured on the research (train) window the loop iterated on. Held-out validation results come from evaluate.py.")
                 st.json(json.loads(last_accepted["metrics"]))
         else:
             st.warning("No strategy passed critique within iteration limit.")

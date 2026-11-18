@@ -144,9 +144,40 @@ It uses a chronological split:
 
 This helps reduce the chance that a strategy is only looking good because it has memorized the research window.
 
+## Limitations
+
+These are known and deliberate to state up front:
+
+- **"Sharpe" is a per-trade score, not an annualised Sharpe ratio.** It is computed as mean / std of trade returns multiplied by √(number of trades), so it behaves more like a t-statistic and rises with trade count. It is used only for relative comparison between strategies on the same window.
+- **No transaction costs or slippage are modelled.** NSE round-trip costs (STT, exchange charges, brokerage) of roughly 0.2–0.3% would reduce returns, especially for short holding periods.
+- **Entries fill at the signal day's close**, and stop-loss / take-profit are checked on closing prices only.
+- **Small sample.** Most strategies produce fewer than 20 trades in the roughly one-year validation window, so many results are flagged as degenerate. With 14 tickers and a Sharpe-delta standard deviation larger than its mean, the aggregate improvement is not statistically significant.
+- **Unequal comparison.** The iterative loop gets up to 8 attempts plus memory, while the baseline gets one stochastic proposal that is regenerated on every run. A best-of-N baseline is the planned fair control.
+- **Validation window reuse.** The same held-out window was inspected across evaluation versions, so it is no longer a fully untouched holdout.
+- **The Critique Agent applies fixed numeric thresholds**; its main value is the natural-language feedback that drives refinement.
+
+## Future work
+
+1. Annualised Sharpe alongside a separate significance statistic, transaction costs, and a buy-and-hold benchmark.
+2. Cached multi-draw baseline with a best-of-N control.
+3. Walk-forward evaluation over a longer history, plus a final untouched holdout run once.
+4. Run-scoped vector memory so evaluation runs are independent.
+
 ## Notes
 
 This repository is a research prototype and a learning project. It is not financial advice and should not be treated as a production trading system.
+
+## Team
+
+Developed as a B.Tech Major Project at ITM University Gwalior.
+
+- Nihal Jeronia
+- Devang Shrivastava
+- Rohit Prajapati
+- Satya Mishra
+- Sharad Rathore
+
+**Project guide:** Mr. Ashish Yadav, Department of CSA, SOCIS, ITM University Gwalior.
 
 ## License
 

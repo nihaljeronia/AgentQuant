@@ -51,7 +51,20 @@ def critique(hypothesis: dict, metrics: dict) -> dict:
     )
     response = llm.invoke([HumanMessage(content=msg)])
     text = str(response.content).strip().removeprefix("```json").removesuffix("```").strip()
-    return json.loads(text)
+    try:
+        result = json.loads(text)
+    except json.JSONDecodeError:
+        result = {}
+    if not isinstance(result, dict):
+        result = {}
+
+    # Fail safe: anything other than an explicit "accept" is treated as "refine",
+    # so a malformed model reply can never crash the loop or accept a strategy.
+    decision = str(result.get("decision", "")).strip().lower()
+    if decision not in ("accept", "refine"):
+        decision = "refine"
+    reasoning = result.get("reasoning") or "Critique response could not be parsed; defaulting to refine."
+    return {"decision": decision, "reasoning": str(reasoning)}
 
 if __name__ == "__main__":
     # Test case that should be accepted (meets all thresholds)
