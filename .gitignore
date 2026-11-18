@@ -34,6 +34,10 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Local AI tooling
+.agents/
+.claude/
+
 # Jupyter
 .ipynb_checkpoints/
 

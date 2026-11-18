@@ -1,0 +1,3 @@
+[server]
+# Keep the dashboard private to this computer: a live run spends OpenAI credits.
+address = "localhost"
