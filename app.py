@@ -48,6 +48,7 @@ st.markdown(
       .aq-pill {display:inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600;}
       .aq-accept {background: rgba(22,163,74,0.15); color: #16A34A;}
       .aq-refine {background: rgba(234,179,8,0.18); color: #B45309;}
+      .aq-worse {background: rgba(220,38,38,0.14); color: #DC2626;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -122,12 +123,34 @@ def db_stats():
 
 
 # ---------------------------------------------------------------- small UI helpers
-def decision_pill(decision: str | None) -> str:
+def run_headline(iterations: int) -> str:
+    """The run shows its last strategy, which is not necessarily the best one tried."""
+    refinements = iterations - 1
+    if refinements < 1:
+        return "Final strategy (no refinements)"
+    return f"Final strategy after {refinements} refinement{'s' if refinements != 1 else ''}"
+
+
+def criteria_note(decision: str | None, iterations: int) -> str:
     if decision == "accept":
-        return '<span class="aq-pill aq-accept">ACCEPTED</span>'
+        return "Strict acceptance criteria: met."
     if decision:
-        return '<span class="aq-pill aq-refine">NOT ACCEPTED (max iterations)</span>'
-    return '<span class="aq-pill aq-refine">IN PROGRESS / UNKNOWN</span>'
+        return f"Strict acceptance criteria: not met within {iterations} iteration{'s' if iterations != 1 else ''}."
+    return "Strict acceptance criteria: status unknown."
+
+
+def comparison_badge(loop_sharpe, baseline_sharpe) -> str | None:
+    """Better / worse badge from the held-out validation Sharpe of loop and baseline."""
+    if loop_sharpe is None or baseline_sharpe is None:
+        return None
+    delta = round(loop_sharpe - baseline_sharpe, 3)
+    if delta > 0:
+        css, text = "aq-accept", "LOOP BETTER"
+    elif delta < 0:
+        css, text = "aq-worse", "LOOP WORSE"
+    else:
+        css, text = "aq-refine", "LEVEL"
+    return f'<span class="aq-pill {css}">{text}</span> validation Sharpe difference: **{delta:+.3f}**'
 
 
 def fmt_pct(x):
@@ -183,6 +206,11 @@ def baseline_comparison(run: dict):
     loop_test = stored_json(run.get("validation_metrics"))
     b_h, b_train, b_test = baseline["hypothesis"], baseline["research"], baseline["validation"]
     st.markdown("#### Loop vs single-shot baseline (held-out validation)")
+    badge = comparison_badge(loop_test.get("sharpe"), b_test.get("sharpe"))
+    if badge:
+        st.markdown(badge, unsafe_allow_html=True)
+    if loop_test.get("insufficient_sample", True) or b_test.get("insufficient_sample", True):
+        st.caption(f"Fewer than {ACCEPT_MIN_TRADES} validation trades: treat this comparison as indicative only.")
     comp = pd.DataFrame([
         {"": "Iterative loop", "Strategy": loop_h.get("rule_name"),
          "Research Sharpe": loop_train.get("sharpe"), "Validation Sharpe": loop_test.get("sharpe"),
@@ -265,7 +293,8 @@ def render_run(run: dict):
     final_h = final["hypothesis"]
     decision = run.get("final_decision") or final["decision"]
 
-    st.markdown(f"### {ticker} {decision_pill(decision)}", unsafe_allow_html=True)
+    st.markdown(f"### {ticker} · {run_headline(len(attempts))}")
+    st.caption(criteria_note(decision, len(attempts)))
     st.caption(f"Run `{run_id}` · {len(attempts)} iteration(s)"
                + (f" · started {str(run['started_at'])[:16].replace('T', ' ')}" if run.get("started_at") else ""))
     baseline_comparison(run)
@@ -482,7 +511,7 @@ def page_run():
                 except Exception as e:
                     status.write(f"Could not save the baseline result: {e}")
 
-        status.update(label=f"Finished: {result['decision']} after {result['iteration']} iteration(s)",
+        status.update(label=f"Finished after {result['iteration']} iteration(s)",
                       state="complete", expanded=False)
         load_runs.clear()
         load_attempts.clear()
