@@ -102,10 +102,10 @@ SIGNAL_INTERPRETERS = {
     "macd": interpret_macd,
 }
 
-def simulate_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> dict:
+def _run_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> list[dict]:
     """
-    Universal trade simulation loop with parameter-driven hold period,
-    stop loss, and take profit exit rules.
+    Core trade simulation loop with parameter-driven hold period,
+    stop loss, and take profit exit rules. Returns one dict per trade.
     """
     close_col = get_close_series(df)
     hold_days = max(1, int(params.get("hold_days", 5)))
@@ -125,6 +125,7 @@ def simulate_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> 
 
             exit_price = None
             exit_idx = i
+            exit_reason = "hold_days"
             max_exit = min(i + hold_days, n - 1)
 
             # Check day-by-day for stop loss / take profit triggers before hold_days expires
@@ -135,10 +136,12 @@ def simulate_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> 
                 if stop_loss_pct is not None and ret <= -abs(float(stop_loss_pct)):
                     exit_price = curr_price
                     exit_idx = t
+                    exit_reason = "stop_loss"
                     break
                 if take_profit_pct is not None and ret >= abs(float(take_profit_pct)):
                     exit_price = curr_price
                     exit_idx = t
+                    exit_reason = "take_profit"
                     break
 
             if exit_price is None:
@@ -146,15 +149,31 @@ def simulate_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> 
                 exit_price = float(close_col.iloc[exit_idx])
 
             if exit_idx > i:
-                trade_return = (exit_price - entry_price) / entry_price
-                trades.append(trade_return)
+                trades.append({
+                    "entry_date": df.index[i],
+                    "exit_date": df.index[exit_idx],
+                    "entry_price": entry_price,
+                    "exit_price": exit_price,
+                    "return": (exit_price - entry_price) / entry_price,
+                    "bars_held": exit_idx - i,
+                    "exit_reason": exit_reason,
+                })
                 i = exit_idx  # Skip to trade exit day to prevent overlapping trades
             else:
                 i += 1
         else:
             i += 1
 
-    return compute_metrics(trades)
+    return trades
+
+
+def simulate_trades(df: pd.DataFrame, entry_signal: pd.Series, params: dict) -> dict:
+    """
+    Universal trade simulation loop with parameter-driven hold period,
+    stop loss, and take profit exit rules.
+    """
+    trades = _run_trades(df, entry_signal, params)
+    return compute_metrics([t["return"] for t in trades])
 
 def simple_drop_and_hold(df: pd.DataFrame, drop_pct=0.05, hold_days=5):
     """Baseline Rule: buy after single-day drop >= drop_pct, sell after hold_days."""
@@ -164,11 +183,8 @@ def simple_drop_and_hold(df: pd.DataFrame, drop_pct=0.05, hold_days=5):
     }
     return evaluate_strategy(df, strategy)
 
-def evaluate_strategy(df: pd.DataFrame, hypothesis: dict) -> dict:
-    """
-    Dynamically interprets a parameterized strategy JSON and backtests it.
-    """
-    strategy = sanitize_strategy(hypothesis)
+def build_entry_signal(df: pd.DataFrame, strategy: dict) -> pd.Series:
+    """Entry signal for an already-sanitized strategy (primary signal AND optional combine_with)."""
     signal_type = strategy["signal_type"]
     params = strategy["params"]
 
@@ -179,11 +195,41 @@ def evaluate_strategy(df: pd.DataFrame, hypothesis: dict) -> dict:
         comb = strategy["combine_with"]
         c_type = comb.get("signal_type")
         c_params = comb.get("params", {})
+        if not isinstance(c_params, dict):
+            c_params = {}
         if c_type in SIGNAL_INTERPRETERS:
             sec_signal = SIGNAL_INTERPRETERS[c_type](df, c_params)
             entry_signal = entry_signal & sec_signal
+    return entry_signal
 
-    return simulate_trades(df, entry_signal, params)
+
+def evaluate_strategy(df: pd.DataFrame, hypothesis: dict) -> dict:
+    """
+    Dynamically interprets a parameterized strategy JSON and backtests it.
+    """
+    strategy = sanitize_strategy(hypothesis)
+    entry_signal = build_entry_signal(df, strategy)
+    return simulate_trades(df, entry_signal, strategy["params"])
+
+
+def backtest_details(df: pd.DataFrame, hypothesis: dict) -> dict:
+    """
+    Same backtest as evaluate_strategy(), but also returns the individual trades and
+    the compounded equity curve (indexed by exit date) for charts and reports.
+    Metrics are computed exactly as in evaluate_strategy().
+    """
+    strategy = sanitize_strategy(hypothesis)
+    entry_signal = build_entry_signal(df, strategy)
+    trades = _run_trades(df, entry_signal, strategy["params"])
+    metrics = compute_metrics([t["return"] for t in trades])
+    trades_df = pd.DataFrame(trades, columns=[
+        "entry_date", "exit_date", "entry_price", "exit_price", "return", "bars_held", "exit_reason",
+    ])
+    if trades_df.empty:
+        equity = pd.Series(dtype=float)
+    else:
+        equity = pd.Series((1 + trades_df["return"]).cumprod().values, index=trades_df["exit_date"])
+    return {"metrics": metrics, "trades": trades_df, "equity": equity, "strategy": strategy}
 
 def compute_metrics(trades: list[float]) -> dict:
     """

@@ -15,10 +15,9 @@ dependencies = [
   "langgraph",
   "langchain",
   "langchain-openai",
-  "langchain-community",
   "chromadb",
-  "sqlite-utils",
   "streamlit",
+  "plotly",
   "python-dotenv",
 ]
 license = { text = "MIT" }
@@ -28,3 +27,4 @@ authors = [
 
 [tool.setuptools]
 packages = ["agents", "backtest", "data_layer", "memory", "report"]
+py-modules = ["app", "config", "graph", "schema", "evaluate", "main_baseline", "variance_check"]

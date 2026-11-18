@@ -4,6 +4,7 @@ from data_layer.fetch_prices import get_price_data, split_data
 from backtest.engine import evaluate_strategy
 from main_baseline import run_baseline
 from graph import run_research_loop
+from memory.log_store import init_db, save_validation
 
 # --- Expanded Ticker Set ---
 TICKERS = [
@@ -72,6 +73,12 @@ def run_evaluation():
         l_result = run_research_loop(ticker, df_train=train_df)
         l_research_metrics = l_result.get("metrics", {})
         l_validation_metrics = evaluate_strategy(test_df, l_result.get("hypothesis", {}))
+        try:
+            conn = init_db()
+            save_validation(conn, l_result["run_id"], l_validation_metrics)
+            conn.close()
+        except Exception as e:
+            print(f"[Warning] Could not save validation metrics: {e}")
         print(f"  [Loop] Research metrics: {l_research_metrics}")
         print(f"  [Loop] Validation metrics: {l_validation_metrics}")
         
