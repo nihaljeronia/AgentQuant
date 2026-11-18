@@ -37,9 +37,14 @@ def init_db(path=None):
             final_decision TEXT,
             final_hypothesis TEXT,
             final_metrics TEXT,
-            validation_metrics TEXT
+            validation_metrics TEXT,
+            baseline TEXT
         )
     """)
+    # Upgrade older databases in place: add baseline if missing.
+    run_cols = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+    if "baseline" not in run_cols:
+        conn.execute("ALTER TABLE runs ADD COLUMN baseline TEXT")
     conn.commit()
     return conn
 
@@ -91,6 +96,12 @@ def finish_run(conn, run_id: str, result: dict):
 
 def save_validation(conn, run_id: str, metrics: dict):
     conn.execute("UPDATE runs SET validation_metrics=? WHERE run_id=?", (json.dumps(metrics), run_id))
+    conn.commit()
+
+
+def save_baseline(conn, run_id: str, baseline: dict):
+    """Store the single-shot baseline (hypothesis, research and validation metrics) with its run."""
+    conn.execute("UPDATE runs SET baseline=? WHERE run_id=?", (json.dumps(baseline), run_id))
     conn.commit()
 
 

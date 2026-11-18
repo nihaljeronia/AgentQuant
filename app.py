@@ -166,6 +166,34 @@ def split_for_run(df: pd.DataFrame, run: dict):
     return split_data(df)
 
 
+def stored_json(value) -> dict:
+    """Decode a JSON column from the runs table; missing values become {}."""
+    if isinstance(value, dict):
+        return value
+    return json.loads(value) if isinstance(value, str) and value else {}
+
+
+def baseline_comparison(run: dict):
+    """Loop vs single-shot baseline table, for runs that recorded a baseline."""
+    baseline = stored_json(run.get("baseline"))
+    if not baseline:
+        return
+    loop_h = stored_json(run.get("final_hypothesis"))
+    loop_train = stored_json(run.get("final_metrics"))
+    loop_test = stored_json(run.get("validation_metrics"))
+    b_h, b_train, b_test = baseline["hypothesis"], baseline["research"], baseline["validation"]
+    st.markdown("#### Loop vs single-shot baseline (held-out validation)")
+    comp = pd.DataFrame([
+        {"": "Iterative loop", "Strategy": loop_h.get("rule_name"),
+         "Research Sharpe": loop_train.get("sharpe"), "Validation Sharpe": loop_test.get("sharpe"),
+         "Validation trades": loop_test.get("num_trades"), "Validation win": loop_test.get("win_rate")},
+        {"": "Single-shot baseline", "Strategy": b_h.get("rule_name"),
+         "Research Sharpe": b_train.get("sharpe"), "Validation Sharpe": b_test.get("sharpe"),
+         "Validation trades": b_test.get("num_trades"), "Validation win": b_test.get("win_rate")},
+    ])
+    st.dataframe(comp, use_container_width=True, hide_index=True)
+
+
 # ---------------------------------------------------------------- charts
 def price_chart(ticker, train, test, d_train, d_test):
     fig = go.Figure()
@@ -240,6 +268,7 @@ def render_run(run: dict):
     st.markdown(f"### {ticker} {decision_pill(decision)}", unsafe_allow_html=True)
     st.caption(f"Run `{run_id}` · {len(attempts)} iteration(s)"
                + (f" · started {str(run['started_at'])[:16].replace('T', ' ')}" if run.get("started_at") else ""))
+    baseline_comparison(run)
 
     try:
         prices = load_prices(ticker)
@@ -399,7 +428,7 @@ def page_run():
         train, test = split_data(prices, train_ratio)
 
         from graph import run_research_loop
-        from memory.log_store import init_db, save_validation
+        from memory.log_store import init_db, save_baseline, save_validation
 
         status = st.status(f"Researching {ticker} on {train.index[0]:%b %Y} – {train.index[-1]:%b %Y}…", expanded=True)
 
@@ -441,30 +470,27 @@ def page_run():
             try:
                 from agents.hypothesis_agent import propose_hypothesis
                 b_h = propose_hypothesis(ticker)
-                baseline = (b_h, evaluate_strategy(train, b_h), evaluate_strategy(test, b_h))
+                baseline = {"hypothesis": b_h, "research": evaluate_strategy(train, b_h),
+                            "validation": evaluate_strategy(test, b_h)}
             except Exception as e:
                 status.write(f"Baseline failed: {e}")
+            if baseline:
+                try:
+                    conn = init_db()
+                    save_baseline(conn, result["run_id"], baseline)
+                    conn.close()
+                except Exception as e:
+                    status.write(f"Could not save the baseline result: {e}")
 
         status.update(label=f"Finished: {result['decision']} after {result['iteration']} iteration(s)",
                       state="complete", expanded=False)
         load_runs.clear()
         load_attempts.clear()
 
-        if baseline:
-            st.markdown("#### Loop vs single-shot baseline (held-out validation)")
-            b_h, b_train, b_test = baseline
-            comp = pd.DataFrame([
-                {"": "Iterative loop", "Strategy": result["hypothesis"].get("rule_name"),
-                 "Research Sharpe": result["metrics"].get("sharpe"), "Validation Sharpe": val.get("sharpe"),
-                 "Validation trades": val.get("num_trades"), "Validation win": val.get("win_rate")},
-                {"": "Single-shot baseline", "Strategy": b_h.get("rule_name"),
-                 "Research Sharpe": b_train.get("sharpe"), "Validation Sharpe": b_test.get("sharpe"),
-                 "Validation trades": b_test.get("num_trades"), "Validation win": b_test.get("win_rate")},
-            ])
-            st.dataframe(comp, use_container_width=True, hide_index=True)
-
         run = {"run_id": result["run_id"], "ticker": ticker, "final_decision": result["decision"],
-               "train_end": str(train.index[-1].date()), "started_at": None}
+               "train_end": str(train.index[-1].date()), "started_at": None,
+               "final_hypothesis": result["hypothesis"], "final_metrics": result["metrics"],
+               "validation_metrics": val, "baseline": baseline}
         render_run(run)
 
 

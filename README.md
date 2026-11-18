@@ -75,8 +75,8 @@ AgentQuant/
 ## Quick start (Windows PowerShell)
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env      # then put your OPENAI_API_KEY in .env
 streamlit run app.py
@@ -86,7 +86,7 @@ The dashboard has four pages:
 
 - **Overview**: the pipeline and what is in the research database
 - **Run research**: pick a ticker and watch the agents propose, backtest, critique and refine live, then see the held-out validation score next to a single-shot baseline
-- **Research runs**: replay any recorded run with the price chart and buy/sell markers, equity curve, per-iteration metrics and the full critique trail
+- **Research runs**: replay any recorded run with the price chart and buy/sell markers, equity curve, per-iteration metrics, the full critique trail and the saved loop-vs-baseline comparison
 - **Evaluation**: charts for `evaluation_summary*.csv` and `variance_report*.csv`
 
 Command line:
